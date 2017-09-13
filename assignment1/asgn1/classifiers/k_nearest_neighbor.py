@@ -152,7 +152,8 @@ class KNearestNeighbor(object):
     for i in xrange(num_test):
       # A list of length k storing the labels of the k nearest neighbors to
       # the ith test point.
-      closest_y = [index for index in np.argsort(dists[i])[:k]]
+      
+      closest_y = [self.y_train[index] for index in np.argsort(dists[i])[:k]]
       #########################################################################
       # TODO:                                                                 #
       # Use the distance matrix to find the k nearest neighbors of the ith    #
