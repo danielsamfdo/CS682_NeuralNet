@@ -124,7 +124,11 @@ class KNearestNeighbor(object):
     # HINT: Try to formulate the l2 distance using matrix multiplication    #
     #       and two broadcast sums.                                         #
     #########################################################################
-    pass
+    Minus = -2 * X.dot(np.transpose(self.X_train))
+    x_t_2 = np.sum(self.X_train**2,axis=1)
+    x_2 = np.sum(X**2,axis=1)
+    dists = Minus + x_t_2
+    dists = np.sqrt(dists + np.reshape(x_2,(len(x_2),1)))
     #########################################################################
     #                         END OF YOUR CODE                              #
     #########################################################################
@@ -148,8 +152,7 @@ class KNearestNeighbor(object):
     for i in xrange(num_test):
       # A list of length k storing the labels of the k nearest neighbors to
       # the ith test point.
-      closest_y = []
-      closest_y = [self.y_train[index] for index in np.argsort(dists[i])[:k]]
+      closest_y = [index for index in np.argsort(dists[i])[:k]]
       #########################################################################
       # TODO:                                                                 #
       # Use the distance matrix to find the k nearest neighbors of the ith    #
