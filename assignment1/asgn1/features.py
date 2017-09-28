@@ -1,7 +1,7 @@
 import matplotlib
 import numpy as np
 from scipy.ndimage import uniform_filter
-
+from skimage.feature import corner_harris, corner_subpix, corner_peaks
 
 def extract_features(imgs, feature_fns, verbose=False):
   """
@@ -64,6 +64,16 @@ def rgb2gray(rgb):
 
   """
   return np.dot(rgb[...,:3], [0.299, 0.587, 0.144])
+
+
+def number_of_corners(im):
+  # convert rgb to grayscale if needed
+  if im.ndim == 3:
+    image = rgb2gray(im)
+  else:
+    image = np.at_least_2d(im)
+  coords = corner_peaks(corner_harris(image), min_distance=5)
+  return np.array([len(coords)])
 
 
 def hog_feature(im):

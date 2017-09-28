@@ -152,7 +152,6 @@ class KNearestNeighbor(object):
     for i in xrange(num_test):
       # A list of length k storing the labels of the k nearest neighbors to
       # the ith test point.
-      
       closest_y = [self.y_train[index] for index in np.argsort(dists[i])[:k]]
       #########################################################################
       # TODO:                                                                 #
@@ -161,10 +160,17 @@ class KNearestNeighbor(object):
       # neighbors. Store these labels in closest_y.                           #
       # Hint: Look up the function numpy.argsort.                             #
       #########################################################################
-      # common = { closest_y[i] : 0 for i in range(len(closest_y)) }
-      # common[class_label] = 1 for class_label in closest_y
-      y_pred[i] = Counter(closest_y).most_common()[0][0]
-
+      elts = Counter(closest_y).most_common()
+      y_pred[i] = elts[0][0]
+      maxcnt = elts[0][1]
+      for i in range(1, len(elts)):
+        if(maxcnt == elts[i][1]):
+          if((y_pred[i]) > (elts[i][0])):
+            # print str(y_pred[i]),"Changed",str(elts[i][0])
+            y_pred[i] = elts[i][0]  ## Get the smaller Label
+        else:
+          break
+      
       #########################################################################
       # TODO:                                                                 #
       # Now that you have found the labels of the k nearest neighbors, you    #
