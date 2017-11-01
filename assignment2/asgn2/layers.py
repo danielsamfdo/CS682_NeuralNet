@@ -24,7 +24,9 @@ def affine_forward(x, w, b):
   # TODO: Implement the affine forward pass. Store the result in out. You     #
   # will need to reshape the input into rows.                                 #
   #############################################################################
+  # print x.shape
   reshaped_x = x.reshape((x.shape[0], np.prod(x.shape[1:])))
+  # print reshaped_x.shape
   out = reshaped_x.dot(w) + b
   #############################################################################
   #                             END OF YOUR CODE                              #
@@ -328,7 +330,7 @@ def dropout_forward(x, dropout_param):
     # TODO: Implement the test phase forward pass for inverted dropout.       #
     ###########################################################################
     # mask = (np.random.randn(*x.shape) < p) / p
-    out = x# * mask 
+    out = x # * mask 
     ###########################################################################
     #                            END OF YOUR CODE                             #
     ###########################################################################
@@ -449,13 +451,12 @@ def conv_backward_naive(dout, cache):
   #############################################################################
   # TODO: Implement the convolutional backward pass.                          #
   #############################################################################
-  print dout.shape, b.shape
   dx = x
   f,channels,hh,ww = w.shape
   db = np.sum(dout,axis=(0,2,3))
 
   padded_x = np.pad(x, pad_width=((0,0),(0,0),(pad,pad),(pad,pad)), mode='constant', constant_values=0)
-  
+  dx_padded = np.zeros_like(padded_x)
   dw = np.zeros_like(w)
   for train_i in range(x.shape[0]):
     input_i = padded_x[train_i]
@@ -469,14 +470,16 @@ def conv_backward_naive(dout, cache):
           column = 0
           j=0
           while(column+conv_w<=padded_x_W):
+            dx_padded[train_i, channel, row:row+conv_h, column:column+conv_w] +=  w[filt,channel] * dout[train_i,filt,i,j] 
             dw[filt,channel] += input_i[channel,row:row+conv_h,column:column+conv_w] * dout[train_i,filt,i,j] 
             column = column+stride
             j+=1
           row = row+stride
           i+=1
-  # for train_i in range(dout.shape[0]):
-  #   dout[train_i]
-
+  if(pad == 0):
+    dx = dx_padded
+  else:
+    dx = dx_padded[:,:,pad:-pad,pad:-pad]
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -499,10 +502,31 @@ def max_pool_forward_naive(x, pool_param):
   - cache: (x, pool_param)
   """
   out = None
+  N,C,H,W = x.shape
+  pool_height = pool_param['pool_height']
+  pool_width = pool_param['pool_width']
+  stride = pool_param['stride']
   #############################################################################
   # TODO: Implement the max pooling forward pass                              #
   #############################################################################
-  pass
+  H_prime = 1 + (H - pool_height)/stride 
+  W_prime = 1 + (W - pool_width)/stride 
+  out = np.zeros((N,C,H_prime,W_prime))
+  for train_i in range(N):
+    input_i = x[train_i]
+    x_H, x_W = input_i[0].shape
+    for channel in range(C):
+      i=0
+      row = 0
+      while(row+pool_height<=x_H):
+        column = 0
+        j=0
+        while(column+pool_width<=x_W):
+          out[train_i,channel,i,j] += np.max(input_i[channel,row:row+pool_height,column:column+pool_width]) 
+          column = column+stride
+          j+=1
+        row = row+stride
+        i+=1
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -522,10 +546,34 @@ def max_pool_backward_naive(dout, cache):
   - dx: Gradient with respect to x
   """
   dx = None
+  x, pool_param = cache
+  N,C,H,W = x.shape
+  dx = np.zeros_like(x)
+  pool_height = pool_param['pool_height']
+  pool_width = pool_param['pool_width']
+  stride = pool_param['stride']
   #############################################################################
   # TODO: Implement the max pooling backward pass                             #
   #############################################################################
-  pass
+  for train_i in range(N):
+    input_i = x[train_i]
+    x_H, x_W = input_i[0].shape
+    for channel in range(C):
+      i=0
+      row = 0
+      while(row+pool_height<=x_H):
+        column = 0
+        j=0
+        while(column+pool_width<=x_W):
+          maxi = np.max(input_i[channel,row:row+pool_height,column:column+pool_width])
+          inp = input_i[channel,row:row+pool_height,column:column+pool_width]
+          inp[inp!=maxi]=0
+          inp[inp==maxi]=1
+          dx[train_i,channel,row:row+pool_height,column:column+pool_width] +=  inp * dout[train_i,channel,i,j]
+          column = column+stride
+          j+=1
+        row = row+stride
+        i+=1
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################

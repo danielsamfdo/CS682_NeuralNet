@@ -36,7 +36,7 @@ class ThreeLayerConvNet(object):
     self.params = {}
     self.reg = reg
     self.dtype = dtype
-
+    C,H,W = input_dim
     ############################################################################
     # TODO: Initialize weights and biases for the three-layer convolutional    #
     # network. Weights should be initialized from a Gaussian with standard     #
@@ -47,7 +47,13 @@ class ThreeLayerConvNet(object):
     # hidden affine layer, and keys 'W3' and 'b3' for the weights and biases   #
     # of the output affine layer.                                              #
     ############################################################################
-    pass
+    std = weight_scale
+    self.params['W1'] = std * np.random.randn(num_filters, C, filter_size, filter_size)
+    self.params['b1'] = np.zeros(num_filters)
+    self.params['W2'] = std * np.random.randn(num_filters*(H/2)*(W/2), hidden_dim)
+    self.params['b2'] = np.zeros(hidden_dim)
+    self.params['W3'] = std * np.random.randn(hidden_dim, num_classes)
+    self.params['b3'] = np.zeros(num_classes)
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -65,7 +71,7 @@ class ThreeLayerConvNet(object):
     W1, b1 = self.params['W1'], self.params['b1']
     W2, b2 = self.params['W2'], self.params['b2']
     W3, b3 = self.params['W3'], self.params['b3']
-
+    grads = {}
     # pass conv_param to the forward pass for the convolutional layer
     filter_size = W1.shape[2]
     conv_param = {'stride': 1, 'pad': (filter_size - 1) / 2}
@@ -74,27 +80,44 @@ class ThreeLayerConvNet(object):
     pool_param = {'pool_height': 2, 'pool_width': 2, 'stride': 2}
 
     scores = None
+    loss = 0
     ############################################################################
     # TODO: Implement the forward pass for the three-layer convolutional net,  #
     # computing the class scores for X and storing them in the scores          #
     # variable.                                                                #
     ############################################################################
-    pass
+    first_layer_output, first_layer_cache = conv_relu_pool_forward(X,W1,b1,conv_param,pool_param)
+    # print X.shape, W1.shape, b1.shape, first_layer_output.shape, W2.shape
+    reshaped_first_x = first_layer_output.reshape((first_layer_output.shape[0], np.prod(first_layer_output.shape[1:])))
+    second_layer_output, second_layer_cache = affine_relu_forward(reshaped_first_x,W2,b2)
+    third_layer_output, third_layer_cache = affine_forward(second_layer_output,W3,b3)
+    scores = np.copy(third_layer_output)
+    loss, dout = softmax_loss(scores,y)
+    reg = self.reg
+    loss += (0.5 * reg * np.sum(W1*W1)) + (0.5 * reg * np.sum(W2*W2)) + (0.5 * reg * np.sum(W3*W3))
+
+    reg = self.reg
+    dthird_layer, grads['W3'], grads['b3']  = affine_backward(dout, third_layer_cache)
+    dsecond_layer, grads['W2'], grads['b2']  = affine_relu_backward(dthird_layer, second_layer_cache)
+    dfirst_layer, grads['W1'], grads['b1'] = conv_relu_pool_backward(dsecond_layer.reshape(first_layer_output.shape), first_layer_cache)
+    grads['W3'] += reg * W3;
+    grads['W2'] += reg * W2;
+    grads['W1'] += reg * W1
+    return loss,grads
+
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
 
-    if y is None:
-      return scores
 
-    loss, grads = 0, {}
+    # loss, grads = 0, {}
     ############################################################################
     # TODO: Implement the backward pass for the three-layer convolutional net, #
     # storing the loss and gradients in the loss and grads variables. Compute  #
     # data loss using softmax, and make sure that grads[k] holds the gradients #
     # for self.params[k]. Don't forget to add L2 regularization!               #
     ############################################################################
-    pass
+    # pass
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
