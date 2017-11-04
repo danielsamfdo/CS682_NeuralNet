@@ -5,7 +5,7 @@ from asgn2.fast_layers import *
 from asgn2.layer_utils import *
 
 
-class ThreeLayerConvNet(object):
+class ConvNetTwo(object):
   """
   A three-layer convolutional network with the following architecture:
 
@@ -87,7 +87,9 @@ class ThreeLayerConvNet(object):
     # variable.                                                                #
     ############################################################################
     first_layer_output, first_layer_cache = conv_relu_pool_forward(X,W1,b1,conv_param,pool_param)
-    # print X.shape, W1.shape, b1.shape, first_layer_output.shape, W2.shape
+    conv_bnorm_firstlayer_op, conv_bnorm_cache = 
+
+
     sh = np.copy(first_layer_output)
     reshaped_first_x = first_layer_output.reshape((first_layer_output.shape[0], np.prod(first_layer_output.shape[1:])))
     second_layer_output, second_layer_cache = affine_relu_forward(reshaped_first_x,W2,b2)

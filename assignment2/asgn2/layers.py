@@ -177,19 +177,23 @@ def batchnorm_forward(x, gamma, beta, bn_param):
     # the momentum variable to update the running mean and running variance,    #
     # storing your result in the running_mean and running_var variables.        #
     #############################################################################
-    X = x
-    X_bar = np.mean(X, axis=0)
-    variance = np.var(X,axis=0)
-    sqrt_variance = np.sqrt(variance+eps)
-    out = (X - X_bar)
-    out = out/sqrt_variance
-    X_cap = np.copy(out)
+    #
+    out = (x - np.mean(x,axis=0))/np.sqrt(np.var(x,axis=0) + eps)
+    cache = (x, np.copy(out), gamma, beta, np.var(x,axis=0), np.mean(x,axis=0), eps)
     out = (out*gamma) + beta
-    cache = (X, X_cap, gamma, beta, variance,  X_bar,eps)
-    running_mean += X_bar
-    running_mean /= 2
-    running_var += variance
-    running_var /= 2
+    running_mean = momentum * running_mean + (1 - momentum) * np.mean(x,axis=0)
+    running_var = momentum * running_var + (1 - momentum) * np.var(x,axis=0)
+    # X = x
+    # X_bar = np.mean(X, axis=0)
+    # variance = np.var(X,axis=0)
+    # sqrt_variance = np.sqrt(variance+eps)
+    # out = (X - X_bar)
+    # out = out/sqrt_variance
+    # X_cap = np.copy(out)
+    # out = (out*gamma) + beta
+    # cache = (X, X_cap, gamma, beta, variance,  X_bar,eps)
+    # running_mean = momentum * running_mean + (1 - momentum) * X_bar
+    # running_var = momentum * running_var + (1 - momentum) * variance
     #############################################################################
     #                             END OF YOUR CODE                              #
     #############################################################################
@@ -611,7 +615,85 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
   # version of batch normalization defined above. Your implementation should  #
   # be very short; ours is less than five lines.                              #
   #############################################################################
-  pass
+
+
+
+  N, C, H, W = x.shape
+  inp = np.transpose(x, (1, 0, 2, 3))
+  inp = inp.reshape((C, N*H*W))
+  inp = np.transpose(inp,(1,0))
+
+  # inp = np.transpose(inp, (1, 0, 2))
+  # inp = inp.reshape((C, N*H*W))
+  # inp = np.transpose(inp,(1,0))
+  out,cache =  batchnorm_forward(inp,gamma,beta,bn_param)
+  out = np.transpose(out, (1,0))
+  out = out.reshape((C, N,H,W))
+  out = np.transpose(out,(1,0,2,3))
+  return out,cache
+
+  mode = bn_param['mode']
+  eps = bn_param.get('eps', 1e-5)
+  momentum = bn_param.get('momentum', 0.9)
+
+  running_mean = bn_param.get('running_mean', np.zeros((C,H,W), dtype=x.dtype))
+  running_var = bn_param.get('running_var', np.zeros((C,H,W), dtype=x.dtype))
+
+  if mode == 'train':
+    out = (x - np.mean(x,axis=0))/np.sqrt(np.var(x,axis=0) + eps)
+    # cache = (x, out, gamma, beta, np.var(x,axis=0), np.mean(x,axis=0), eps)
+    # print beta.shape, gamma.shape, out.shape
+    for i in range(C):
+      out[:,i,:,:] = out[:,i,:,:]*gamma[i] + beta[i]
+    cache = (x, out, gamma, beta, np.var(x,axis=0), np.mean(x,axis=0), eps)
+    running_mean = momentum * running_mean + (1 - momentum) * np.mean(x,axis=(0))
+    running_var = momentum * running_var + (1 - momentum) * np.var(x,axis=(0))
+  elif mode == 'test':
+    out = np.zeros_like(x)
+    out = (x - running_mean)/np.sqrt(running_var + eps)
+    # for i in range(C):
+    #   out[:,i,:,:] = (x[:,i,:,:] - running_mean[i])/np.sqrt(running_var[i] + eps)
+    #   out[:,i,:,:] = out[:,i,:,:]*gamma[i] + beta[i]
+    cache = (x, out, gamma, beta, running_var, running_mean, eps)
+
+
+  bn_param['running_mean'] = running_mean
+  bn_param['running_var'] = running_var
+
+  # mode = bn_param['mode']
+  # eps = bn_param['eps']
+  # momentum = bn_param['momentum']
+  # N, D = x.shape
+  # running_mean = bn_param.get('running_mean', np.zeros(D, dtype=x.dtype))
+  # running_var = bn_param.get('running_var', np.zeros(D, dtype=x.dtype))
+
+  # sample_mean = np.mean(x, axis=0)
+  # sample_variance = np.var(x,axis=0)
+
+  # sqrt_variance = np.sqrt(sample_variance+eps)
+  # running_mean = momentum * running_mean + (1 - momentum) * sample_mean
+  # running_var = momentum * running_var + (1 - momentum) * sqrt_variance
+
+
+  # out = (X - X_bar)
+  # out = out/sqrt_variance
+  # if(bn_param["mode"]=="train"):
+  #   cache = (X, X_cap, gamma, beta, variance,  X_bar,eps)
+  # else:
+  #   cache = (X, running_mean, gamma, beta, running_var,  X_bar,eps)
+
+
+  # out, cache = None, None
+  # X = x
+  # X_bar = np.mean(X, axis=0)
+  # variance = np.var(X,axis=0)
+  # sqrt_variance = np.sqrt(variance+eps)
+  # out = (X - X_bar)
+  # out = out/sqrt_variance
+  # X_cap = np.copy(out)
+  # out = (out*gamma) + beta
+  # cache = (X, X_cap, gamma, beta, variance,  X_bar,eps)
+  
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -641,11 +723,42 @@ def spatial_batchnorm_backward(dout, cache):
   # version of batch normalization defined above. Your implementation should  #
   # be very short; ours is less than five lines.                              #
   #############################################################################
-  pass
+  N,C,H,W = dout.shape
+
+  N, C, H, W = dout.shape
+  inp = np.transpose(dout, (1, 0, 2, 3))
+  inp = inp.reshape((C, N*H*W))
+  inp = np.transpose(inp,(1,0))
+
+  dx,dgamma,dbeta =  batchnorm_backward(inp,cache)
+  out = np.transpose(dx, (1,0))
+  out = out.reshape((C, N,H,W))
+  out = np.transpose(out,(1,0,2,3))
+  return out,dgamma,dbeta
+
+
+  X, X_cap, gamma, beta, variance, X_bar, eps = cache
+  m = X.shape[0]
+  c = X.shape[1]
+  print dout.shape, X_cap.shape
+  dgamma = np.sum(dout * X_cap,axis=(0))
+  print dgamma.shape
+  dgamma = np.mean(dgamma,axis=(1,2))
+  print dgamma.shape
+  # dgamma = np.mean(np.sum(dout, axis=(0)) * np.sum(X_cap, axis=(0)), axis=(1,2))
+  print dgamma
+  dx = X
+  dxcap = np.zeros_like(X_cap)
+  dbeta = np.sum(dout, axis=(0,2,3))
+  for i in range(c):
+    dxcap[:,i,:,:] = np.copy(dout[:,i,:,:])*gamma[i]
+  dvariance = np.sum(dxcap * ((X-X_bar) * (-0.5 * ((variance+eps)**(-1.5)))), axis=0)
+  dmean = np.sum(-1*dxcap/np.sqrt(variance+eps), axis=0) + (dvariance  * np.sum(((X-X_bar) * -2),axis=0)/m)
+  dx = dxcap/np.sqrt(variance+eps) + (dvariance* 2 * (X-X_bar)/m) + (dmean/m)
+
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
-
   return dx, dgamma, dbeta
   
 

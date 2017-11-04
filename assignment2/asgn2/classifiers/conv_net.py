@@ -5,9 +5,9 @@ from asgn2.fast_layers import *
 from asgn2.layer_utils import *
 
 
-class ThreeLayerConvNet(object):
+class ConvNet(object):
   """
-  A three-layer convolutional network with the following architecture:
+  A convolutional network with the following architecture:
 
   conv - relu - 2x2 max pool - affine - relu - affine - softmax
 
@@ -50,10 +50,14 @@ class ThreeLayerConvNet(object):
     std = weight_scale
     self.params['W1'] = std * np.random.randn(num_filters, C, filter_size, filter_size)
     self.params['b1'] = np.zeros(num_filters)
-    self.params['W2'] = std * np.random.randn(num_filters*(H)*(W)/4, hidden_dim)
-    self.params['b2'] = np.zeros(hidden_dim)
-    self.params['W3'] = std * np.random.randn(hidden_dim, num_classes)
-    self.params['b3'] = np.zeros(num_classes)
+    self.params['W2'] = std * np.random.randn(num_filters, C, filter_size, filter_size)
+    self.params['b2'] = np.zeros(num_filters)
+    self.params['W3'] = std * np.random.randn(num_filters, C, filter_size, filter_size)
+    self.params['b3'] = np.zeros(num_filters)
+    self.params['W4'] = std * np.random.randn(num_filters*(H)*(W)/4, hidden_dim)
+    self.params['b4'] = np.zeros(hidden_dim)
+    self.params['W5'] = std * np.random.randn(hidden_dim, num_classes)
+    self.params['b5'] = np.zeros(num_classes)
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -71,6 +75,8 @@ class ThreeLayerConvNet(object):
     W1, b1 = self.params['W1'], self.params['b1']
     W2, b2 = self.params['W2'], self.params['b2']
     W3, b3 = self.params['W3'], self.params['b3']
+    W4, b4 = self.params['W4'], self.params['b4']
+    W5, b5 = self.params['W5'], self.params['b5']
     grads = {}
     # pass conv_param to the forward pass for the convolutional layer
     filter_size = W1.shape[2]
@@ -87,11 +93,13 @@ class ThreeLayerConvNet(object):
     # variable.                                                                #
     ############################################################################
     first_layer_output, first_layer_cache = conv_relu_pool_forward(X,W1,b1,conv_param,pool_param)
+    first_1_layer_output, first_1_layer_cache = conv_relu_pool_forward(X,W2,b2,conv_param,pool_param)
+    first_2_layer_output, first_2_layer_cache = conv_relu_pool_forward(X,W3,b3,conv_param,pool_param)
     # print X.shape, W1.shape, b1.shape, first_layer_output.shape, W2.shape
-    sh = np.copy(first_layer_output)
-    reshaped_first_x = first_layer_output.reshape((first_layer_output.shape[0], np.prod(first_layer_output.shape[1:])))
-    second_layer_output, second_layer_cache = affine_relu_forward(reshaped_first_x,W2,b2)
-    third_layer_output, third_layer_cache = affine_forward(second_layer_output,W3,b3)
+    sh = np.copy(first_2_layer_output)
+    reshaped_first_x = first_layer_output.reshape((first_2_layer_output.shape[0], np.prod(first_2_layer_output.shape[1:])))
+    second_layer_output, second_layer_cache = affine_relu_forward(reshaped_first_x,W4,b4)
+    third_layer_output, third_layer_cache = affine_forward(second_layer_output,W5,b5)
     scores = np.copy(third_layer_output)
     if y is None:
       return scores
@@ -101,9 +109,14 @@ class ThreeLayerConvNet(object):
     loss += (0.5 * reg * np.sum(W1*W1)) + (0.5 * reg * np.sum(W2*W2)) + (0.5 * reg * np.sum(W3*W3))
 
     reg = self.reg
-    dthird_layer, grads['W3'], grads['b3']  = affine_backward(dout, third_layer_cache)
-    dsecond_layer, grads['W2'], grads['b2']  = affine_relu_backward(dthird_layer, second_layer_cache)
-    dfirst_layer, grads['W1'], grads['b1'] = conv_relu_pool_backward(dsecond_layer.reshape(sh.shape), first_layer_cache)
+    dthird_layer, grads['W5'], grads['b5']  = affine_backward(dout, third_layer_cache)
+    dsecond_layer, grads['W4'], grads['b4']  = affine_relu_backward(dthird_layer, second_layer_cache)
+    dfirst_2_layer, grads['W3'], grads['b3'] = conv_relu_pool_backward(dsecond_layer.reshape(sh.shape), first_2_layer_cache)
+    dfirst_1_layer, grads['W2'], grads['b2'] = conv_relu_pool_backward(dfirst_2_layer, first_1_layer_cache)
+    dfirst_layer, grads['W1'], grads['b1'] = conv_relu_pool_backward(dfirst_1_layer, first_layer_cache)
+
+    grads['W4'] += reg * W4;
+    grads['W5'] += reg * W5;
     grads['W3'] += reg * W3;
     grads['W2'] += reg * W2;
     grads['W1'] += reg * W1
