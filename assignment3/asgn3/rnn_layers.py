@@ -152,17 +152,20 @@ def rnn_backward(dh, cache):
   # print dh[:,T-1,:]
 
   for i in reversed(range(T)):
-    print i#dh[:,i,:].reshape(N,H)
-    dx_step, dprev_h_step, dWx_step, dWh_step, db_step = rnn_step_backward(dh[:,i,:].reshape(N,H), cache[i])
-    if(i!=0):
-      dh[:,i-1,:]= dh[:,i-1,:] + copy.deepcopy(dprev_h_step)
-    dx[:,i,:] += copy.deepcopy(dx_step)
+    # print i#dh[:,i,:].reshape(N,H)
+    dnext_h = dh[:, i, :] if i == (T-1) else dh[:, i, :] + dprev_h_step
+    dx_step, dprev_h_step, dWx_step, dWh_step, db_step = rnn_step_backward(dnext_h, cache[i])
+    # dx_step, dprev_h_step, dWx_step, dWh_step, db_step = rnn_step_backward(dh[:,i,:], cache[i])
+    # if(i!=0):
+      # print i
+      # dh[:,(i-1),:] = dh[:,(i-1),:] + copy.deepcopy(dprev_h_step)
+    dx[:,i,:] = copy.deepcopy(dx_step)
     dWh += copy.deepcopy(dWh_step)
     dWx += copy.deepcopy(dWx_step)
-    dh0 += copy.deepcopy(dprev_h_step)
     db += copy.deepcopy(db_step)
-    print db_step
-  print db
+  dh0 = copy.deepcopy(dprev_h_step)
+    # print db_step
+  # print db
     
   # db = db/T
   # dWx/=T
@@ -198,7 +201,13 @@ def word_embedding_forward(x, W):
   #                                                                            #
   # HINT: This should be very simple.                                          #
   ##############################################################################
-  pass
+  N,T = x.shape
+  V,D = W.shape
+  out = np.zeros((N,T,D))
+  for i in range(N):
+    for j in range(T):
+      out[i,j,:] = W[x[i,j]] 
+  cache = (out,x,W)
   ##############################################################################
   #                               END OF YOUR CODE                             #
   ##############################################################################
@@ -226,7 +235,14 @@ def word_embedding_backward(dout, cache):
   #                                                                            #
   # HINT: Look up the function np.add.at                                       #
   ##############################################################################
-  pass
+  out,x,W = cache
+  N,T = x.shape
+  V,D = W.shape
+  dW = np.zeros((V,D))
+  for i in range(N):
+    for j in range(T):
+      dW[x[i,j]]+= dout[i,j,:]
+
   ##############################################################################
   #                               END OF YOUR CODE                             #
   ##############################################################################
@@ -515,6 +531,7 @@ def temporal_affine_forward(x, w, b):
   - out: Output data of shape (N, T, M)
   - cache: Values needed for the backward pass
   """
+  # print x.shape
   N, T, D = x.shape
   M = b.shape[0]
   out = x.reshape(N * T, D).dot(w).reshape(N, T, M) + b

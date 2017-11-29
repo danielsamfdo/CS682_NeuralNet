@@ -95,6 +95,7 @@ class CaptioningRNN(object):
     # after receiving word t. The first element of captions_in will be the START
     # token, and the first element of captions_out will be the first word.
     captions_in = captions[:, :-1]
+    # print captions_in.shape,captions_in
     captions_out = captions[:, 1:]
     
     # You'll need this 
@@ -135,7 +136,26 @@ class CaptioningRNN(object):
     # defined above to store loss and gradients; grads[k] should give the      #
     # gradients for self.params[k].                                            #
     ############################################################################
-    pass
+    N,D = features.shape
+    # print N
+    if(self.cell_type == 'rnn'):
+        h0, h0_cache = temporal_affine_forward(features.reshape((N,1,D)),W_proj,b_proj)
+        N,T,H = h0.shape
+        h0 = h0.reshape(N,H)
+        embeddings, cache_embedding = word_embedding_forward(captions_in, W_embed)
+        # print embeddings.shape
+        h, h_cache = rnn_forward(embeddings, h0, Wx, Wh, b)
+        fc, fc_cache = temporal_affine_forward(h,W_vocab,b_vocab)
+        loss,dx = temporal_softmax_loss(fc,captions_out,mask)
+
+        dfc,grads["W_vocab"],grads["b_vocab"] = temporal_affine_backward(dx,fc_cache)
+        dembeddings, dh0, grads["Wx"], grads["Wh"], grads["b"] = rnn_backward(dfc, h_cache)
+        grads["W_embed"] = word_embedding_backward(dembeddings, cache_embedding)
+        dfeatures, grads["W_proj"], grads["b_proj"], = temporal_affine_backward(dh0,h0_cache)
+
+        # grads["W_proj"] = 
+        # Backward Pass 
+
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -168,6 +188,7 @@ class CaptioningRNN(object):
       of captions should be the first sampled word, not the <START> token.
     """
     N = features.shape[0]
+    D = features.shape[1]
     captions = self._null * np.ones((N, max_length), dtype=np.int32)
 
     # Unpack parameters
@@ -197,7 +218,29 @@ class CaptioningRNN(object):
     # functions; you'll need to call rnn_step_forward or lstm_step_forward in #
     # a loop.                                                                 #
     ###########################################################################
-    pass
+    input_wembedding = np.zeros((N,1))
+    input_wembedding[:,:] = self._start
+    captions[:,0] = self._start 
+    # print captions[:,1]
+    h0, h0_cache = temporal_affine_forward(features.reshape((N,1,D)),W_proj,b_proj)
+    N,T,H = h0.shape
+    h0 = h0.reshape(N,H)
+    next_h = h0
+    for i in range(max_length):
+        embeddings,we_cache = word_embedding_forward(input_wembedding,W_embed)
+        # print input_wembedding.shape, W_embed.shape,embeddings.shape
+        N,m,D = embeddings.shape
+        # print embeddings,
+        next_h, cache = rnn_step_forward(embeddings.reshape(N,D), next_h, Wx, Wh, b)
+        fc, fc_cache = temporal_affine_forward(next_h.reshape(N,1,H),W_vocab,b_vocab)
+        N,m,V = fc.shape
+
+        fc = fc.reshape((N,V))
+        probs = np.exp(fc - np.max(fc, axis=1, keepdims=True))
+        probs /= np.sum(probs, axis=1, keepdims=True)
+        # print probs.shape
+        # print W_vocab.shape, N, max_length, fc.shape, np.argmax(fc,axis=1)
+        captions[:,i] = np.argmax(probs,axis=1)
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
