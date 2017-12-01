@@ -164,15 +164,6 @@ def rnn_backward(dh, cache):
     dWx += copy.deepcopy(dWx_step)
     db += copy.deepcopy(db_step)
   dh0 = copy.deepcopy(dprev_h_step)
-    # print db_step
-  # print db
-    
-  # db = db/T
-  # dWx/=T
-  # dh0/=T
-  # dWh/=T
-
-
 
   ##############################################################################
   #                               END OF YOUR CODE                             #
@@ -371,7 +362,7 @@ def lstm_step_backward(dnext_h, dnext_c, cache):
   # Given dE_dh as dnext_h
   # Computing dE_do = dnext_h * tanh(ct)
   # Computing dE_dnextc = dnext_h * (o * (1 - (next_c**2)))
-  dE_dnextc = dnext_h * (o * (1 - (next_c**2)))
+  dE_dnextc = dnext_h * (o * (1 - (np.tanh(next_c)**2)))
   dE_do = dnext_h * np.tanh(next_c)
 
   dE_dx = (dE_do * do_dao).dot(dao_dx.T)
@@ -379,6 +370,9 @@ def lstm_step_backward(dnext_h, dnext_c, cache):
   dE_dWh = dao_dWh.T.dot(dE_do * do_dao)
   dE_db = dE_do * do_dao
   dE_dprev_h = (dE_do * do_dao).dot(dao_dprev_h.T)
+
+  dnext_c += dE_dnextc
+
 # dWx = x.T.dot((1 - (next_h**2)) * dnext_h)
   # Given M = nextc = f dot prev_c + i dot g
   # Given dM_dnextc
@@ -419,7 +413,7 @@ def lstm_step_backward(dnext_h, dnext_c, cache):
         # dnext_c += dnext_h * (o*(1-(next_c**2))*dnext_c  + next_c*(o*(1-o)))
         # dnext_c +=  (o*(1-(next_c**2)))
 
-        # dprev_c = dnext_c * f
+  dprev_c = dnext_c * f
 
         # do = o * (1-o)
         # di = i * (1-i)
@@ -476,7 +470,7 @@ def lstm_forward(x, h0, Wx, Wh, b):
     inp_x = x[:,i,:]
     if(i==0):
       prev_h = h0
-    next_h, next_c, cache = lstm_step_forward(inp_x.reshape(N,D), prev_h.reshape(N,H), prev_c, Wx, Wh, b)
+    next_h, next_c, cache[i] = lstm_step_forward(inp_x.reshape(N,D), prev_h.reshape(N,H), prev_c, Wx, Wh, b)
     h[:,i,:] += copy.deepcopy(next_h)
     prev_h = copy.deepcopy(next_h)
     prev_c = copy.deepcopy(next_c)
@@ -507,7 +501,34 @@ def lstm_backward(dh, cache):
   # TODO: Implement the backward pass for an LSTM over an entire timeseries.  #
   # You should use the lstm_step_backward function that you just defined.     #
   #############################################################################
-  pass
+  x,h0,Wx,Wh,b = cache["major_info"]
+  N,T,D = x.shape
+  N,H = h0.shape
+  dx = np.zeros_like(x)
+  dh0 = np.zeros_like(h0)
+  dWx = np.zeros_like(Wx)
+  dWh = np.zeros_like(Wh)
+  db = np.zeros_like(b)
+  dprev_c_step = np.zeros_like(h0)
+  dprev_h_step = dh[:,T-1,:].reshape(N,H)
+  # print dh[:,T-1,:]
+
+  for i in reversed(range(T)):
+    # print i#dh[:,i,:].reshape(N,H)
+    o = cache[i][7]
+    next_c = cache[i][9]
+    # dnext_h = dh[:, i, :]
+    # dE_dnextc = dnext_h * (o * (1 - (np.tanh(next_c)**2)))
+    # dnext_c = dE_dnextc if i == (T-1) else (dE_dnextc + dprev_c_step)
+    dnext_h = dh[:, i, :] if i == (T-1) else dh[:, i, :] + dprev_h_step
+    # dE_dnextc = dnext_h * (o * (1 - (np.tanh(next_c)**2)))
+    # dnext_c = dE_dnextc if i == (T-1) else (dE_dnextc + dprev_c_step)
+    dx_step, dprev_h_step, dprev_c_step, dWx_step, dWh_step, db_step = lstm_step_backward(dnext_h, dprev_c_step, cache[i])
+    dx[:,i,:] = copy.deepcopy(dx_step)
+    dWh += copy.deepcopy(dWh_step)
+    dWx += copy.deepcopy(dWx_step)
+    db += copy.deepcopy(db_step)
+  dh0 = copy.deepcopy(dprev_h_step)
   ##############################################################################
   #                               END OF YOUR CODE                             #
   ##############################################################################

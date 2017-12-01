@@ -4,7 +4,7 @@ from asgn3.layers import *
 from asgn3.rnn_layers import *
 
 
-class CaptioningRNN(object):
+class MnistRNN(object):
   """
   A CaptioningRNN produces captions from image features using a recurrent
   neural network.
@@ -16,8 +16,7 @@ class CaptioningRNN(object):
   Note that we don't use any regularization for the CaptioningRNN.
   """
   
-  def __init__(self, word_to_idx, input_dim=512, wordvec_dim=128,
-               hidden_dim=128, cell_type='rnn', dtype=np.float32):
+  def __init__(self, hidden_dim=128, cell_type='lstm', dtype=np.float32):
     """
     Construct a new CaptioningRNN instance.
 
@@ -36,25 +35,8 @@ class CaptioningRNN(object):
     
     self.cell_type = cell_type
     self.dtype = dtype
-    self.word_to_idx = word_to_idx
-    self.idx_to_word = {i: w for w, i in word_to_idx.iteritems()}
     self.params = {}
     
-    vocab_size = len(word_to_idx)
-
-    self._null = word_to_idx['<NULL>']
-    self._start = word_to_idx.get('<START>', None)
-    self._end = word_to_idx.get('<END>', None)
-    
-    # Initialize word vectors
-    self.params['W_embed'] = np.random.randn(vocab_size, wordvec_dim)
-    self.params['W_embed'] /= 100
-    
-    # Initialize CNN -> hidden state projection parameters
-    self.params['W_proj'] = np.random.randn(input_dim, hidden_dim)
-    self.params['W_proj'] /= np.sqrt(input_dim)
-    self.params['b_proj'] = np.zeros(hidden_dim)
-
     # Initialize parameters for the RNN
     dim_mul = {'lstm': 4, 'rnn': 1}[cell_type]
     self.params['Wx'] = np.random.randn(wordvec_dim, dim_mul * hidden_dim)
@@ -88,32 +70,10 @@ class CaptioningRNN(object):
     - loss: Scalar loss
     - grads: Dictionary of gradients parallel to self.params
     """
-    # Cut captions into two pieces: captions_in has everything but the last word
-    # and will be input to the RNN; captions_out has everything but the first
-    # word and this is what we will expect the RNN to generate. These are offset
-    # by one relative to each other because the RNN should produce word (t+1)
-    # after receiving word t. The first element of captions_in will be the START
-    # token, and the first element of captions_out will be the first word.
-    captions_in = captions[:, :-1]
-    # print captions_in.shape,captions_in
-    captions_out = captions[:, 1:]
     
-    # You'll need this 
-    mask = (captions_out != self._null)
-
-    # Weight and bias for the affine transform from image features to initial
-    # hidden state
-    W_proj, b_proj = self.params['W_proj'], self.params['b_proj']
-    
-    # Word embedding matrix
-    W_embed = self.params['W_embed']
-
     # Input-to-hidden, hidden-to-hidden, and biases for the RNN
     Wx, Wh, b = self.params['Wx'], self.params['Wh'], self.params['b']
 
-    # Weight and bias for the hidden-to-vocab transformation.
-    W_vocab, b_vocab = self.params['W_vocab'], self.params['b_vocab']
-    
     loss, grads = 0.0, {}
     ############################################################################
     # TODO: Implement the forward and backward passes for the CaptioningRNN.   #
@@ -137,7 +97,6 @@ class CaptioningRNN(object):
     # gradients for self.params[k].                                            #
     ############################################################################
     N,D = features.shape
-    # print N
     h0, h0_cache = temporal_affine_forward(features.reshape((N,1,D)),W_proj,b_proj)
     N,T,H = h0.shape
     h0 = h0.reshape(N,H)
