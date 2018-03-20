@@ -88,9 +88,9 @@ class ThreeLayerConvNet(object):
     ############################################################################
     first_layer_output, first_layer_cache = conv_relu_pool_forward(X,W1,b1,conv_param,pool_param)
     # print X.shape, W1.shape, b1.shape, first_layer_output.shape, W2.shape
-    sh = np.copy(first_layer_output)
-    reshaped_first_x = first_layer_output.reshape((first_layer_output.shape[0], np.prod(first_layer_output.shape[1:])))
-    second_layer_output, second_layer_cache = affine_relu_forward(reshaped_first_x,W2,b2)
+    # sh = np.copy(first_layer_output)
+    # reshaped_first_x = first_layer_output.reshape((first_layer_output.shape[0], np.prod(first_layer_output.shape[1:])))
+    second_layer_output, second_layer_cache = affine_relu_forward(first_layer_output,W2,b2)
     third_layer_output, third_layer_cache = affine_forward(second_layer_output,W3,b3)
     scores = np.copy(third_layer_output)
     if y is None:
@@ -103,7 +103,7 @@ class ThreeLayerConvNet(object):
     reg = self.reg
     dthird_layer, grads['W3'], grads['b3']  = affine_backward(dout, third_layer_cache)
     dsecond_layer, grads['W2'], grads['b2']  = affine_relu_backward(dthird_layer, second_layer_cache)
-    dfirst_layer, grads['W1'], grads['b1'] = conv_relu_pool_backward(dsecond_layer.reshape(sh.shape), first_layer_cache)
+    dfirst_layer, grads['W1'], grads['b1'] = conv_relu_pool_backward(dsecond_layer, first_layer_cache)
     grads['W3'] += reg * W3;
     grads['W2'] += reg * W2;
     grads['W1'] += reg * W1

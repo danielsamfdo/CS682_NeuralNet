@@ -87,7 +87,7 @@ def softmax_loss_vectorized(W, X, y, reg):
   num_classes = W.shape[1]
   num_train = X.shape[0]
   scores = X.dot(W)
-
+  # NORMALIZER
   MaxArray_RowWise = np.max(scores,axis=1)
   MaxArray_RowWise = np.reshape(MaxArray_RowWise,(len(MaxArray_RowWise),1))
   scores = scores - MaxArray_RowWise

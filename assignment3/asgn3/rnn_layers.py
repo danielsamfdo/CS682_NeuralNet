@@ -104,12 +104,14 @@ def rnn_forward(x, h0, Wx, Wh, b):
   N,T,D = x.shape
   N,H = h0.shape
   h = np.zeros((N,T,H))
+  next_h = np.zeros_like(h0) 
   cache = {}
   cache["major_info"] = (x,h0,Wx,Wh,b)
   for i in range(T):
     inp_x = x[:,i,:]
     if(i==0):
       prev_h = h0
+
     next_h, cache[i] = rnn_step_forward(inp_x.reshape(N,D), prev_h.reshape(N,H), Wx, Wh, b)
     h[:,i,:] += copy.deepcopy(next_h)
     prev_h = copy.deepcopy(next_h)

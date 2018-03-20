@@ -5,6 +5,10 @@ from asgn2.fast_layers import *
 from asgn2.layer_utils import *
 
 
+
+
+
+
 class ConvNetTwo(object):
   """
   A three-layer convolutional network with the following architecture:
@@ -17,7 +21,7 @@ class ConvNetTwo(object):
   """
 
   def __init__(self, input_dim=(3, 32, 32), num_filters=32, filter_size=7,
-               hidden_dim=100, num_classes=10, weight_scale=1e-3, reg=0.0,
+               hidden_dim=100, num_classes=10, weight_scale=1e-3, reg=0.0, bn_param={},
                dtype=np.float32):
     """
     Initialize a new network.
@@ -36,6 +40,7 @@ class ConvNetTwo(object):
     self.params = {}
     self.reg = reg
     self.dtype = dtype
+    self.bn_param = bn_param
     C,H,W = input_dim
     ############################################################################
     # TODO: Initialize weights and biases for the three-layer convolutional    #
@@ -86,13 +91,13 @@ class ConvNetTwo(object):
     # computing the class scores for X and storing them in the scores          #
     # variable.                                                                #
     ############################################################################
-    first_layer_output, first_layer_cache = conv_relu_pool_forward(X,W1,b1,conv_param,pool_param)
-    conv_bnorm_firstlayer_op, conv_bnorm_cache = 
+    first_layer_output, first_layer_cache = conv_bnorm_relu_pool_forward(X,W1,b1,conv_param,pool_param,self.bn_param)
 
-
-    sh = np.copy(first_layer_output)
-    reshaped_first_x = first_layer_output.reshape((first_layer_output.shape[0], np.prod(first_layer_output.shape[1:])))
-    second_layer_output, second_layer_cache = affine_relu_forward(reshaped_first_x,W2,b2)
+    # print first_layer_output.shape
+    # print X.shape, W1.shape, b1.shape, first_layer_output.shape, W2.shape
+    # sh = np.copy(first_layer_output)
+    # reshaped_first_x = first_layer_output.reshape((first_layer_output.shape[0], np.prod(first_layer_output.shape[1:])))
+    second_layer_output, second_layer_cache = affine_batch_norm_relu_forward(first_layer_output,W2,b2,self.bn_param,"_affine_layer_1")
     third_layer_output, third_layer_cache = affine_forward(second_layer_output,W3,b3)
     scores = np.copy(third_layer_output)
     if y is None:
@@ -104,7 +109,40 @@ class ConvNetTwo(object):
 
     reg = self.reg
     dthird_layer, grads['W3'], grads['b3']  = affine_backward(dout, third_layer_cache)
-    dsecond_layer, grads['W2'], grads['b2']  = affine_relu_backward(dthird_layer, second_layer_cache)
+    dsecond_layer, grads['W2'], grads['b2']  = affine_batch_norm_relu_backward(dthird_layer, second_layer_cache)
+    dfirst_layer, grads['W1'], grads['b1'] = conv_bnorm_relu_pool_backward(dsecond_layer, first_layer_cache)
+    # dfirst_layer, grads['W1'], grads['b1'] = conv_bnorm_relu_pool_backward(dsecond_layer.reshape(first_layer_output.shape), first_layer_cache)
+    grads['W3'] += reg * W3;
+    grads['W2'] += reg * W2;
+    grads['W1'] += reg * W1
+    return loss,grads
+    ############################################################################
+    # TODO: Implement the forward pass for the three-layer convolutional net,  #
+    # computing the class scores for X and storing them in the scores          #
+    # variable.                                                                #
+    ############################################################################
+    first_layer_output, first_layer_cache = conv_relu_pool_forward(X,W1,b1,conv_param,pool_param)
+    N,C,H,W = X.shape
+    gamma = np.random.randn(C)
+    beta = np.random.randn(C)
+    # conv_bnorm_firstlayer_op, conv_bnorm_cache = spatial_batchnorm_forward(x,gamma,beta,{})
+
+
+    sh = np.copy(first_layer_output)
+    # reshaped_first_x = sh.reshape((sh.shape[0], np.prod(sh.shape[1:])))
+    second_layer_output, second_layer_cache = affine_batch_norm_relu_forward(reshaped_first_x,W2,b2,self.bn_param)
+    third_layer_output, third_layer_cache = affine_forward(second_layer_output,W3,b3)
+    scores = np.copy(third_layer_output)
+    if y is None:
+      return scores
+    
+    loss, dout = softmax_loss(scores,y)
+    reg = self.reg
+    loss += (0.5 * reg * np.sum(W1*W1)) + (0.5 * reg * np.sum(W2*W2)) + (0.5 * reg * np.sum(W3*W3))
+    reg = self.reg
+    dthird_layer, grads['W3'], grads['b3']  = affine_backward(dout, third_layer_cache)
+    dsecond_layer, grads['W2'], grads['b2']  = affine_batch_norm_relu_backward(dthird_layer, second_layer_cache)
+    conv_bnorm_firstlayer_op, grads['gamma'], grads['beta'] = spatial_batchnorm_forward(dsecond_layer,conv_bnorm_cache)
     dfirst_layer, grads['W1'], grads['b1'] = conv_relu_pool_backward(dsecond_layer.reshape(sh.shape), first_layer_cache)
     grads['W3'] += reg * W3;
     grads['W2'] += reg * W2;

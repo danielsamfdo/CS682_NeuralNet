@@ -110,7 +110,7 @@ class TwoLayerNet(object):
     ProbabilityMatrix = exp_scores/normalizer
     loss = -1 * np.sum(np.log(ProbabilityMatrix[range(len(ProbabilityMatrix)),y]))
     loss/=num_train
-    loss += 0.5*reg* np.sum(W1*W1) + 0.5*reg* np.sum(W2*W2)
+    loss += 0.5 * reg * np.sum(W1*W1) + 0.5*reg* np.sum(W2*W2)
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################

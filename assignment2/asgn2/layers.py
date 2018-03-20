@@ -115,8 +115,7 @@ def relu_backward(dout, cache):
   #############################################################################
   return dx
 
-
-def batchnorm_forward(x, gamma, beta, bn_param):
+def batchnorm_forward(x, gamma, beta, bn_param,layer=""):
   """
   Forward pass for batch normalization.
   
@@ -159,8 +158,9 @@ def batchnorm_forward(x, gamma, beta, bn_param):
   momentum = bn_param.get('momentum', 0.9)
 
   N, D = x.shape
-  running_mean = bn_param.get('running_mean', np.zeros(D, dtype=x.dtype))
-  running_var = bn_param.get('running_var', np.zeros(D, dtype=x.dtype))
+
+  running_mean = bn_param.get('running_mean'+layer, np.zeros(D, dtype=x.dtype))
+  running_var = bn_param.get('running_var'+layer, np.zeros(D, dtype=x.dtype))
 
   out, cache = None, None
   if mode == 'train':
@@ -177,12 +177,13 @@ def batchnorm_forward(x, gamma, beta, bn_param):
     # the momentum variable to update the running mean and running variance,    #
     # storing your result in the running_mean and running_var variables.        #
     #############################################################################
-    #
     out = (x - np.mean(x,axis=0))/np.sqrt(np.var(x,axis=0) + eps)
     cache = (x, np.copy(out), gamma, beta, np.var(x,axis=0), np.mean(x,axis=0), eps)
+    # print gamma.shape,out.shape,"********"
     out = (out*gamma) + beta
     running_mean = momentum * running_mean + (1 - momentum) * np.mean(x,axis=0)
     running_var = momentum * running_var + (1 - momentum) * np.var(x,axis=0)
+
     # X = x
     # X_bar = np.mean(X, axis=0)
     # variance = np.var(X,axis=0)
@@ -218,8 +219,8 @@ def batchnorm_forward(x, gamma, beta, bn_param):
     raise ValueError('Invalid forward batchnorm mode "%s"' % mode)
 
   # Store the updated running means back into bn_param
-  bn_param['running_mean'] = running_mean
-  bn_param['running_var'] = running_var
+  bn_param['running_mean'+layer] = running_mean
+  bn_param['running_var'+layer] = running_var
 
   return out, cache
 
@@ -285,7 +286,17 @@ def batchnorm_backward_alt(dout, cache):
   # should be able to compute gradients with respect to the inputs in a       #
   # single statement; our implementation fits on a single 80-character line.  #
   #############################################################################
-  pass
+  x, x_cap, gamma, beta, variance, X_bar, eps = cache
+  m = x.shape[0]
+  dgamma = np.sum(dout * x_cap,axis=0)
+  dbeta = np.sum(dout, axis=0)
+  sqrt_var = np.sqrt(variance+eps)
+  xminusxbar = (x-X_bar)
+  # dx = (dout*gamma)*(((m - 1.0)/(m*sqrt_var)) - (((xminusxbar)/(2*((variance+eps)**1.5))) * ((2* (np.sum(xminusxbar,axis=0))) + ((m- 1.0)*(-2 * X_bar)/m))))#- ((1-1.0/m)*(xminusxbar)*(-2)*(X_bar)*((variance+eps)**-1.5))/2
+
+  dx = gamma * ((dout/sqrt_var) + (np.mean(dout*(-xminusxbar), axis=0)/(sqrt_var**3))*xminusxbar + np.mean(-dout, axis=0)/sqrt_var)
+  # dx = (gamma) * ((1/sqrt_var) + (np.sum(-(dout*xminusxbar)/((sqrt_var**3)), axis=0) * 2 * (npxminusxbar) )/m + (-1.0/(sqrt_var)/(m)))
+
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -584,7 +595,7 @@ def max_pool_backward_naive(dout, cache):
   return dx
 
 
-def spatial_batchnorm_forward(x, gamma, beta, bn_param):
+def spatial_batchnorm_forward(x, gamma, beta, bn_param,layer=""):
   """
   Computes the forward pass for spatial batch normalization.
   
@@ -617,16 +628,16 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
   #############################################################################
 
 
-
+  # print x.shape, gamma.shape, beta.shape
   N, C, H, W = x.shape
   inp = np.transpose(x, (1, 0, 2, 3))
   inp = inp.reshape((C, N*H*W))
   inp = np.transpose(inp,(1,0))
-
+  # print inp.shape
   # inp = np.transpose(inp, (1, 0, 2))
   # inp = inp.reshape((C, N*H*W))
   # inp = np.transpose(inp,(1,0))
-  out,cache =  batchnorm_forward(inp,gamma,beta,bn_param)
+  out,cache =  batchnorm_forward(inp,gamma,beta,bn_param,layer)
   out = np.transpose(out, (1,0))
   out = out.reshape((C, N,H,W))
   out = np.transpose(out,(1,0,2,3))
@@ -740,13 +751,13 @@ def spatial_batchnorm_backward(dout, cache):
   X, X_cap, gamma, beta, variance, X_bar, eps = cache
   m = X.shape[0]
   c = X.shape[1]
-  print dout.shape, X_cap.shape
+  # print dout.shape, X_cap.shape
   dgamma = np.sum(dout * X_cap,axis=(0))
-  print dgamma.shape
+  # print dgamma.shape
   dgamma = np.mean(dgamma,axis=(1,2))
-  print dgamma.shape
+  # print dgamma.shape
   # dgamma = np.mean(np.sum(dout, axis=(0)) * np.sum(X_cap, axis=(0)), axis=(1,2))
-  print dgamma
+  # print dgamma
   dx = X
   dxcap = np.zeros_like(X_cap)
   dbeta = np.sum(dout, axis=(0,2,3))

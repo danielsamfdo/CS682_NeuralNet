@@ -138,8 +138,8 @@ class CaptioningRNN(object):
     ############################################################################
     N,D = features.shape
     # print N
-    h0, h0_cache = temporal_affine_forward(features.reshape((N,1,D)),W_proj,b_proj)
-    N,T,H = h0.shape
+    h0, h0_cache = affine_forward(features,W_proj,b_proj)
+    N,H = h0.shape
     h0 = h0.reshape(N,H)
     embeddings, cache_embedding = word_embedding_forward(captions_in, W_embed)
     # print embeddings.shape
@@ -157,7 +157,7 @@ class CaptioningRNN(object):
     else:# LSTM
         dembeddings, dh0, grads["Wx"], grads["Wh"], grads["b"] = lstm_backward(dfc, h_cache)
     grads["W_embed"] = word_embedding_backward(dembeddings, cache_embedding)
-    dfeatures, grads["W_proj"], grads["b_proj"], = temporal_affine_backward(dh0,h0_cache)
+    dfeatures, grads["W_proj"], grads["b_proj"], = affine_backward(dh0,h0_cache)
 
     ############################################################################
     #                             END OF YOUR CODE                             #
@@ -225,29 +225,23 @@ class CaptioningRNN(object):
     input_wembedding[:,:] = self._start
     captions[:,0] = self._start 
     # print captions[:,1]
-    h0, h0_cache = temporal_affine_forward(features.reshape((N,1,D)),W_proj,b_proj)
-    N,T,H = h0.shape
-    h0 = h0.reshape(N,H)
+    h0 = features.dot(W_proj) + b_proj
     next_c = np.zeros_like(h0)
     next_h = h0
-    for i in range(max_length):
-        embeddings,we_cache = word_embedding_forward(input_wembedding,W_embed)
-        # print input_wembedding.shape, W_embed.shape,embeddings.shape
-        N,m,D = embeddings.shape
-        # print embeddings,
-        if(self.cell_type == 'rnn'):
-            next_h, cache = rnn_step_forward(embeddings.reshape(N,D), next_h, Wx, Wh, b)
-        else: #LSTM
-            next_h, next_c, cache = lstm_step_forward(embeddings.reshape(N,D), next_h, next_c, Wx, Wh, b)
-        fc, fc_cache = temporal_affine_forward(next_h.reshape(N,1,H),W_vocab,b_vocab)
-        N,m,V = fc.shape
 
-        fc = fc.reshape((N,V))
-        probs = np.exp(fc - np.max(fc, axis=1, keepdims=True))
-        probs /= np.sum(probs, axis=1, keepdims=True)
-        # print probs.shape
-        # print W_vocab.shape, N, max_length, fc.shape, np.argmax(fc,axis=1)
-        captions[:,i] = np.argmax(probs,axis=1)
+    for i in range(max_length):
+        # embeddings,we_cache = word_embedding_forward(input_wembedding,W_embed)
+        # print input_wembedding.shape, W_embed.shape,embeddings.shape
+        # N,m,D = embeddings.shape
+        if(self.cell_type == 'rnn'):
+            next_h, cache = rnn_step_forward(W_embed[captions[:,i]], next_h, Wx, Wh, b)
+        else: #LSTM
+            next_h, next_c, cache = lstm_step_forward(W_embed[captions[:,i]], next_h, next_c, Wx, Wh, b)
+        # print b_vocab.shape, W_vocab.shape
+        fc =  next_h.dot(W_vocab) + b_vocab
+        # probs = np.exp(fc - np.max(fc, axis=1, keepdims=True))
+        # probs /= np.sum(probs, axis=1, keepdims=True)
+        captions[:,i] = np.argmax(fc,axis=1)
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################

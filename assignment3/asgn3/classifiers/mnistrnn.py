@@ -16,7 +16,7 @@ class MnistRNN(object):
   Note that we don't use any regularization for the CaptioningRNN.
   """
   
-  def __init__(self, hidden_dim=128, cell_type='lstm', dtype=np.float32):
+  def __init__(self, hidden_dim=128, cell_type='rnn', dtype=np.float32):
     """
     Construct a new CaptioningRNN instance.
 
@@ -38,18 +38,20 @@ class MnistRNN(object):
     self.params = {}
     
     # Initialize parameters for the RNN
+    wordvec_dim = 28
     dim_mul = {'lstm': 4, 'rnn': 1}[cell_type]
     self.params['Wx'] = np.random.randn(wordvec_dim, dim_mul * hidden_dim)
     self.params['Wx'] /= np.sqrt(wordvec_dim)
     self.params['Wh'] = np.random.randn(hidden_dim, dim_mul * hidden_dim)
     self.params['Wh'] /= np.sqrt(hidden_dim)
     self.params['b'] = np.zeros(dim_mul * hidden_dim)
-    
+
     # Initialize output to vocab weights
-    self.params['W_vocab'] = np.random.randn(hidden_dim, vocab_size)
+    self.params['W_vocab'] = np.random.randn(hidden_dim, 10)
     self.params['W_vocab'] /= np.sqrt(hidden_dim)
-    self.params['b_vocab'] = np.zeros(vocab_size)
+    self.params['b_vocab'] = np.zeros(10)
       
+
     # Cast parameters to correct dtype
     for k, v in self.params.iteritems():
       self.params[k] = v.astype(self.dtype)
@@ -70,10 +72,18 @@ class MnistRNN(object):
     - loss: Scalar loss
     - grads: Dictionary of gradients parallel to self.params
     """
-    
+    # print features.shape, captions.shape
     # Input-to-hidden, hidden-to-hidden, and biases for the RNN
     Wx, Wh, b = self.params['Wx'], self.params['Wh'], self.params['b']
+    W_vocab, b_vocab = self.params['W_vocab'], self.params['b_vocab']
+    N = features.shape[0]
+    H = Wh.shape[0]
+    mask = np.zeros((N,28))
 
+    mask[:,27] = 1
+    flat_y = np.zeros((N,28))
+    for i in range(N):
+        flat_y[i,range(28)] = captions[i]
     loss, grads = 0.0, {}
     ############################################################################
     # TODO: Implement the forward and backward passes for the CaptioningRNN.   #
@@ -96,36 +106,33 @@ class MnistRNN(object):
     # defined above to store loss and gradients; grads[k] should give the      #
     # gradients for self.params[k].                                            #
     ############################################################################
-    N,D = features.shape
-    h0, h0_cache = temporal_affine_forward(features.reshape((N,1,D)),W_proj,b_proj)
-    N,T,H = h0.shape
-    h0 = h0.reshape(N,H)
-    embeddings, cache_embedding = word_embedding_forward(captions_in, W_embed)
+    h0 = np.zeros((N,H))
+    # embeddings, cache_embedding = word_embedding_forward(features, W_embed)
     # print embeddings.shape
     if(self.cell_type == 'rnn'):
-        h, h_cache = rnn_forward(embeddings, h0, Wx, Wh, b)
+        # print features.shape, h0.shape, Wx.shape, Wh.shape, b.shape
+        h, h_cache = rnn_forward(features, h0, Wx, Wh, b)
     else:# LSTM
-        h, h_cache = lstm_forward(embeddings, h0, Wx, Wh, b)
+        # print features.shape, h0.shape, Wx.shape, Wh.shape, b.shape
+        h, h_cache = lstm_forward(features, h0, Wx, Wh, b)
 
     fc, fc_cache = temporal_affine_forward(h,W_vocab,b_vocab)
-    loss,dx = temporal_softmax_loss(fc,captions_out,mask)
+    dx = np.zeros((N,28,10))
+    loss,dx[:,27,:],answers = mnist_softmax_loss(fc[:,27,:].reshape(N,10),captions)
 
     dfc,grads["W_vocab"],grads["b_vocab"] = temporal_affine_backward(dx,fc_cache)
     if(self.cell_type == 'rnn'):
         dembeddings, dh0, grads["Wx"], grads["Wh"], grads["b"] = rnn_backward(dfc, h_cache)
     else:# LSTM
         dembeddings, dh0, grads["Wx"], grads["Wh"], grads["b"] = lstm_backward(dfc, h_cache)
-    grads["W_embed"] = word_embedding_backward(dembeddings, cache_embedding)
-    dfeatures, grads["W_proj"], grads["b_proj"], = temporal_affine_backward(dh0,h0_cache)
+    # grads["W_embed"] = word_embedding_backward(dembeddings, cache_embedding)
 
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
     
     return loss, grads
-
-
-  def sample(self, features, max_length=30):
+  def sample(self, features):
     """
     Run a test-time forward pass for the model, sampling captions for input
     feature vectors.
@@ -149,15 +156,10 @@ class MnistRNN(object):
       where each element is an integer in the range [0, V). The first element
       of captions should be the first sampled word, not the <START> token.
     """
-    N = features.shape[0]
-    D = features.shape[1]
-    captions = self._null * np.ones((N, max_length), dtype=np.int32)
-
-    # Unpack parameters
-    W_proj, b_proj = self.params['W_proj'], self.params['b_proj']
-    W_embed = self.params['W_embed']
     Wx, Wh, b = self.params['Wx'], self.params['Wh'], self.params['b']
     W_vocab, b_vocab = self.params['W_vocab'], self.params['b_vocab']
+    N = features.shape[0]
+    H = Wh.shape[0]
     
     ###########################################################################
     # TODO: Implement test-time sampling for the model. You will need to      #
@@ -180,34 +182,53 @@ class MnistRNN(object):
     # functions; you'll need to call rnn_step_forward or lstm_step_forward in #
     # a loop.                                                                 #
     ###########################################################################
-    input_wembedding = np.zeros((N,1))
-    input_wembedding[:,:] = self._start
-    captions[:,0] = self._start 
-    # print captions[:,1]
-    h0, h0_cache = temporal_affine_forward(features.reshape((N,1,D)),W_proj,b_proj)
-    N,T,H = h0.shape
-    h0 = h0.reshape(N,H)
-    next_c = np.zeros_like(h0)
-    next_h = h0
-    for i in range(max_length):
-        embeddings,we_cache = word_embedding_forward(input_wembedding,W_embed)
-        # print input_wembedding.shape, W_embed.shape,embeddings.shape
-        N,m,D = embeddings.shape
-        # print embeddings,
-        if(self.cell_type == 'rnn'):
-            next_h, cache = rnn_step_forward(embeddings.reshape(N,D), next_h, Wx, Wh, b)
-        else: #LSTM
-            next_h, next_c, cache = lstm_step_forward(embeddings.reshape(N,D), next_h, next_c, Wx, Wh, b)
-        fc, fc_cache = temporal_affine_forward(next_h.reshape(N,1,H),W_vocab,b_vocab)
-        N,m,V = fc.shape
+    h0 = np.zeros((N,H))
+    # embeddings, cache_embedding = word_embedding_forward(features, W_embed)
+    # print embeddings.shape
+    if(self.cell_type == 'rnn'):
+        # print features.shape, h0.shape, Wx.shape, Wh.shape, b.shape
+        h, h_cache = rnn_forward(features, h0, Wx, Wh, b)
+    else:# LSTM
+        # print features.shape, h0.shape, Wx.shape, Wh.shape, b.shape
+        h, h_cache = lstm_forward(features, h0, Wx, Wh, b)
 
-        fc = fc.reshape((N,V))
-        probs = np.exp(fc - np.max(fc, axis=1, keepdims=True))
-        probs /= np.sum(probs, axis=1, keepdims=True)
-        # print probs.shape
-        # print W_vocab.shape, N, max_length, fc.shape, np.argmax(fc,axis=1)
-        captions[:,i] = np.argmax(probs,axis=1)
+    fc, fc_cache = temporal_affine_forward(h,W_vocab,b_vocab)
+    dx = np.zeros((N,28,10))
+    answers = mnist_softmax_loss(fc[:,27,:].reshape(N,10),None)
+
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
-    return captions
+    return answers
+
+
+def mnist_softmax_loss(x, y):
+  """
+  Computes the loss and gradient for softmax classification.
+
+  Inputs:
+  - x: Input data, of shape (N, C) where x[i, j] is the score for the jth class
+    for the ith input.
+  - y: Vector of labels, of shape (N,) where y[i] is the label for x[i] and
+    0 <= y[i] < C
+
+  Returns a tuple of:
+  - loss: Scalar giving the loss
+  - dx: Gradient of the loss with respect to x
+  """
+  probs = np.exp(x - np.max(x, axis=1, keepdims=True))
+  probs /= np.sum(probs, axis=1, keepdims=True)
+  N = x.shape[0]
+  answers = np.zeros_like(probs)
+  answers[range(N),np.argmax(probs,axis=1)] = 1
+  if(y==None):
+    return answers
+  loss = -np.sum(np.log(probs[np.arange(N), y])) / N
+  dx = probs.copy()
+  dx[np.arange(N), y] -= 1
+  dx /= N
+  
+  return loss, dx, answers
+
+
+

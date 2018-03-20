@@ -163,11 +163,11 @@ class KNearestNeighbor(object):
       elts = Counter(closest_y).most_common()
       y_pred[i] = elts[0][0]
       maxcnt = elts[0][1]
-      for i in range(1, len(elts)):
-        if(maxcnt == elts[i][1]):
-          if((y_pred[i]) > (elts[i][0])):
+      for j in range(1, len(elts)):
+        if(maxcnt == elts[j][1]):
+          if((y_pred[i]) > (elts[j][0])):
             # print str(y_pred[i]),"Changed",str(elts[i][0])
-            y_pred[i] = elts[i][0]  ## Get the smaller Label
+            y_pred[i] = elts[j][0]  ## Get the smaller Label
         else:
           break
       
